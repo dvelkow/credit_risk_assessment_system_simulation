@@ -8,7 +8,7 @@ def create_dimensional_model(spark: SparkSession):
     Create a simple dimensional model for credit risk analysis.
     """
     # Load resolved entity data
-    resolved_data = spark.read.format("delta").load(f"{Config.DELTA_LAKE_PATH}/resolved_entities")
+    resolved_data = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/resolved_entities")
 
     # Create dimension tables
     dim_business = resolved_data.select("business_id", "credit_score").distinct()
@@ -25,10 +25,10 @@ def create_dimensional_model(spark: SparkSession):
         "sentiment_score"
     )
 
-    # Write dimension and fact tables to Delta Lake
-    dim_business.write.format("delta").mode("overwrite").save(f"{Config.DELTA_LAKE_PATH}/dim_business")
-    dim_time.write.format("delta").mode("overwrite").save(f"{Config.DELTA_LAKE_PATH}/dim_time")
-    fact_credit_risk.write.format("delta").mode("overwrite").save(f"{Config.DELTA_LAKE_PATH}/fact_credit_risk")
+    # Write dimension and fact tables to Parquet
+    dim_business.write.parquet(f"{Config.DATA_LAKE_PATH}/dim_business", mode="overwrite")
+    dim_time.write.parquet(f"{Config.DATA_LAKE_PATH}/dim_time", mode="overwrite")
+    fact_credit_risk.write.parquet(f"{Config.DATA_LAKE_PATH}/fact_credit_risk", mode="overwrite")
 
     print("Dimensional model created successfully.")
 

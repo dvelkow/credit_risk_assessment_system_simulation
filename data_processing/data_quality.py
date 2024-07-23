@@ -1,5 +1,3 @@
-# data_processing/data_quality.py
-
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, count
 from config.config import Config

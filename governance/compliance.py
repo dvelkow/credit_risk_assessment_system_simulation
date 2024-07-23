@@ -7,6 +7,7 @@ def ensure_compliance():
     ensuring proper data encryption, verifying consent management, etc.
     """
     print("Checking compliance...")
+    # Simulated compliance checks
     print("- Verifying data retention policies")
     print("- Checking encryption status of sensitive data")
     print("- Auditing access logs")

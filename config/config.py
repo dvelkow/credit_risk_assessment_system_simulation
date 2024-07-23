@@ -1,4 +1,3 @@
-
 import os
 from dotenv import load_dotenv
 
@@ -13,7 +12,7 @@ class Config:
     WEBSITE_TRAFFIC_API = "https://mockapi.com/website_traffic"
 
     # Storage configurations (using local paths for testing)
-    DATA_LAKE_PATH = "/tmp/data_lake"
+    DATA_LAKE_PATH = os.getenv("DATA_LAKE_PATH", "/tmp/credit_risk_data_lake")
 
     # Spark configurations
     SPARK_MASTER = "local[*]"  # Run Spark locally

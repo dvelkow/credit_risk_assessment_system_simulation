@@ -1,4 +1,3 @@
-
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when
 from pyspark.ml.feature import VectorAssembler
@@ -90,6 +89,39 @@ def score_business(spark: SparkSession, model, business_id: str):
                     .otherwise("Very High Risk")
 
     print(f"Credit Risk Category: {risk_category}")
+
+def get_risk_assessment(spark: SparkSession, model, business_id: str):
+    """
+    Get risk assessment for a specific business as a string.
+    """
+    fact_credit_risk = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/fact_credit_risk")
+    dim_business = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/dim_business")
+    
+    business_data = fact_credit_risk.join(dim_business, "business_id").filter(col("business_id") == business_id)
+
+    if business_data.count() == 0:
+        return f"No data found for business ID: {business_id}"
+
+    features = ["balance", "num_transactions", "followers", "engagement_rate", "sentiment_score"]
+    data = business_data.select(features)
+
+    assembler = VectorAssembler(inputCols=features, outputCol="features")
+    data_assembled = assembler.transform(data)
+
+    prediction = model.transform(data_assembled)
+    predicted_score = prediction.select("prediction").first()[0]
+
+    risk_category = "Very High Risk"
+    if predicted_score >= 700:
+        risk_category = "Low Risk"
+    elif predicted_score >= 650:
+        risk_category = "Moderate Risk"
+    elif predicted_score >= 600:
+        risk_category = "Medium Risk"
+    elif predicted_score >= 500:
+        risk_category = "High Risk"
+
+    return f"Predicted credit score for business {business_id}: {predicted_score:.2f}\nCredit Risk Category: {risk_category}"
 
 if __name__ == "__main__":
     spark = get_spark_session()
