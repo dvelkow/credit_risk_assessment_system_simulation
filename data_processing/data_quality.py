@@ -1,21 +1,20 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, count
 from config.config import Config
-from utils.spark_utils import get_spark_session
 
 def check_data_quality(spark: SparkSession, table_name: str):
     """
-    Perform basic data quality checks on a Delta table.
+    Perform basic data quality checks on a Parquet table.
     """
-    df = spark.read.format("delta").load(f"{Config.DELTA_LAKE_PATH}/{table_name}")
+    df = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/{table_name}")
 
     # Check for null values
     null_counts = df.select([count(when(col(c).isNull(), c)).alias(c) for c in df.columns])
-    
+
     # Check for duplicate rows
     total_rows = df.count()
     distinct_rows = df.distinct().count()
-    
+
     # Print results
     print(f"Data Quality Report for {table_name}:")
     null_counts.show()

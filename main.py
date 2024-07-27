@@ -15,13 +15,11 @@ def generate_mock_data(spark):
         StructField("balance", FloatType(), True),
         StructField("num_transactions", IntegerType(), True)
     ])
-    
     bank_data = [
         (id, f"2023-0{random.randint(1, 9)}-01", random.uniform(100, 10000), random.randint(1, 100))
         for id in Config.TEST_BUSINESS_IDS
         for _ in range(10)
     ]
-    
     bank_df = spark.createDataFrame(bank_data, bank_schema)
     bank_df.write.parquet(f"{Config.DATA_LAKE_PATH}/bank_statements", mode="overwrite")
 
@@ -30,16 +28,13 @@ def generate_mock_data(spark):
         StructField("business_id", StringType(), True),
         StructField("credit_score", IntegerType(), True)
     ])
-    
     credit_data = [(id, random.randint(300, 850)) for id in Config.TEST_BUSINESS_IDS]
     credit_df = spark.createDataFrame(credit_data, credit_schema)
     credit_df.write.parquet(f"{Config.DATA_LAKE_PATH}/credit_reports", mode="overwrite")
-
     print("Mock data generated successfully.")
 
 def main():
     spark = get_spark_session()
-
     generate_mock_data(spark)
 
     # Data Processing
