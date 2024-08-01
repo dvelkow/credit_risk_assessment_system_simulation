@@ -8,7 +8,7 @@ from analytics import credit_scoring, risk_dashboard
 from utils.spark_utils import get_spark_session
 
 def generate_mock_data(spark):
-    # Generate bank statement data
+    # Generating bank statement data
     bank_schema = StructType([
         StructField("business_id", StringType(), True),
         StructField("transaction_date", StringType(), True),
@@ -23,7 +23,7 @@ def generate_mock_data(spark):
     bank_df = spark.createDataFrame(bank_data, bank_schema)
     bank_df.write.parquet(f"{Config.DATA_LAKE_PATH}/bank_statements", mode="overwrite")
 
-    # Generate credit report data
+    # Generating random credit report data to test if the model works
     credit_schema = StructType([
         StructField("business_id", StringType(), True),
         StructField("credit_score", IntegerType(), True)
@@ -31,10 +31,13 @@ def generate_mock_data(spark):
     credit_data = [(id, random.randint(300, 850)) for id in Config.TEST_BUSINESS_IDS]
     credit_df = spark.createDataFrame(credit_data, credit_schema)
     credit_df.write.parquet(f"{Config.DATA_LAKE_PATH}/credit_reports", mode="overwrite")
+
     print("Mock data generated successfully.")
 
 def main():
     spark = get_spark_session()
+    
+    # Generating mock data
     generate_mock_data(spark)
 
     # Data Processing

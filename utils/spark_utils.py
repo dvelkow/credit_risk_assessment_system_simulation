@@ -5,4 +5,6 @@ def get_spark_session():
     return SparkSession.builder \
         .appName(Config.SPARK_APP_NAME) \
         .master(Config.SPARK_MASTER) \
+        .config("spark.driver.memory", "4g") \
+        .config("spark.executor.memory", "4g") \
         .getOrCreate()
