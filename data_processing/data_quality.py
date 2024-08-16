@@ -15,15 +15,23 @@ def check_data_quality(spark: SparkSession, table_name: str):
     total_rows = df.count()
     distinct_rows = df.distinct().count()
 
-    # Print results
-    print(f"Data Quality Report for {table_name}:")
-    null_counts.show()
-    print(f"Total Rows: {total_rows}")
-    print(f"Distinct Rows: {distinct_rows}")
-    print(f"Duplicate Rows: {total_rows - distinct_rows}")
+
+    # Additional checks for personal financial data
+    if table_name == "personal_financial_data":
+        print("\nAdditional checks for personal financial data:")
+        print("Credit score range:")
+        df.agg({"credit_score": "min"}).show()
+        df.agg({"credit_score": "max"}).show()
+        
+        print("Balance range:")
+        df.agg({"balance": "min"}).show()
+        df.agg({"balance": "max"}).show()
+        
+        print("Number of transactions range:")
+        df.agg({"num_transactions": "min"}).show()
+        df.agg({"num_transactions": "max"}).show()
 
 if __name__ == "__main__":
-    spark = get_spark_session()
-    check_data_quality(spark, "bank_statements")
-    check_data_quality(spark, "credit_reports")
+    spark = SparkSession.builder.appName("DataQuality").getOrCreate()
+    check_data_quality(spark, "personal_financial_data")
     spark.stop()

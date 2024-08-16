@@ -6,7 +6,6 @@ def ingest_bank_statements(spark: SparkSession, start_date: str, end_date: str):
     """
     Ingest bank statements from the API and save as a Delta table.
     """
-    # Fetch data from API
     response = requests.get(
         f"{Config.BANK_STATEMENT_API}",
         params={"start_date": start_date, "end_date": end_date}
