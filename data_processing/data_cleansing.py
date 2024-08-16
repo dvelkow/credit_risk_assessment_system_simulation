@@ -6,25 +6,23 @@ def clean_data(spark: SparkSession):
     """
     Perform data cleansing operations on the datasets.
     """
-    # Read the datasets
-    bank_statements = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/bank_statements")
-    credit_reports = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/credit_reports")
+    # Read the dataset
+    personal_financial_data = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/personal_financial_data")
 
-    # Clean bank statements
-    cleaned_bank_statements = bank_statements.withColumn(
+    # Clean personal financial data
+    cleaned_data = personal_financial_data.withColumn(
         "balance",
         when(col("balance") < 0, 0).otherwise(col("balance"))
-    )
-
-    # Clean credit reports
-    cleaned_credit_reports = credit_reports.withColumn(
+    ).withColumn(
         "credit_score",
         when(col("credit_score") < 300, 300).when(col("credit_score") > 850, 850).otherwise(col("credit_score"))
+    ).withColumn(
+        "num_transactions",
+        when(col("num_transactions") < 0, 0).otherwise(col("num_transactions"))
     )
 
     # Write cleaned data back to the data lake
-    cleaned_bank_statements.write.parquet(f"{Config.DATA_LAKE_PATH}/cleaned_bank_statements", mode="overwrite")
-    cleaned_credit_reports.write.parquet(f"{Config.DATA_LAKE_PATH}/cleaned_credit_reports", mode="overwrite")
+    cleaned_data.write.mode("overwrite").parquet(f"{Config.DATA_LAKE_PATH}/cleaned_personal_financial_data")
 
     print("Data cleaning completed successfully.")
 

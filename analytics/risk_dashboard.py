@@ -1,5 +1,3 @@
-# analytics/risk_dashboard.py
-
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import avg, count, min, max, stddev, col, udf
 from pyspark.sql.types import FloatType
@@ -36,24 +34,24 @@ def calculate_metrics(df):
     savings_apy_udf = udf(calculate_savings_apy, FloatType())
     lending_rate_udf = udf(calculate_lending_rate, FloatType())
 
-    df_with_risk = df.withColumn("risk_score", risk_score_udf(col("credit_score"), col("balance"), col("num_transactions")))
+    df_with_risk = df.withColumn("risk_score", risk_score_udf(col("latest_credit_score"), col("latest_balance"), col("total_transactions")))
     df_with_rates = df_with_risk.withColumn("savings_apy", savings_apy_udf(col("risk_score")))
     df_with_rates = df_with_rates.withColumn("lending_rate", lending_rate_udf(col("risk_score")))
 
     return df_with_rates.agg(
-        avg("credit_score").alias("avg_credit_score"),
-        min("credit_score").alias("min_credit_score"),
-        max("credit_score").alias("max_credit_score"),
-        stddev("credit_score").alias("stddev_credit_score"),
-        avg("balance").alias("avg_balance"),
-        min("balance").alias("min_balance"),
-        max("balance").alias("max_balance"),
-        stddev("balance").alias("stddev_balance"),
-        avg("num_transactions").alias("avg_num_transactions"),
+        avg("latest_credit_score").alias("avg_credit_score"),
+        min("latest_credit_score").alias("min_credit_score"),
+        max("latest_credit_score").alias("max_credit_score"),
+        stddev("latest_credit_score").alias("stddev_credit_score"),
+        avg("latest_balance").alias("avg_balance"),
+        min("latest_balance").alias("min_balance"),
+        max("latest_balance").alias("max_balance"),
+        stddev("latest_balance").alias("stddev_balance"),
+        avg("total_transactions").alias("avg_num_transactions"),
         avg("risk_score").alias("avg_risk_score"),
         avg("savings_apy").alias("avg_savings_apy"),
         avg("lending_rate").alias("avg_lending_rate"),
-        count("business_id").alias("total_businesses")
+        count("client_id").alias("total_clients")
     )
 
 def update_dashboard(spark: SparkSession):
@@ -77,16 +75,16 @@ def update_dashboard(spark: SparkSession):
     print(f"Average Risk Score: {row['avg_risk_score']:.2f}")
     print(f"Average Savings APY: {row['avg_savings_apy']:.2%}")
     print(f"Average Lending Rate: {row['avg_lending_rate']:.2%}")
-    print(f"Total Businesses: {row['total_businesses']}")
+    print(f"Total Clients: {row['total_clients']}")
 
-    high_risk_businesses = fact_credit_risk.filter(
-        (fact_credit_risk.credit_score < Config.HIGH_RISK_THRESHOLD) |
-        (fact_credit_risk.balance < Config.MIN_AVG_BALANCE) |
-        (fact_credit_risk.num_transactions < Config.MIN_NUM_TRANSACTIONS)
+    high_risk_clients = fact_credit_risk.filter(
+        (fact_credit_risk.latest_credit_score < Config.HIGH_RISK_THRESHOLD) |
+        (fact_credit_risk.latest_balance < Config.MIN_AVG_BALANCE) |
+        (fact_credit_risk.total_transactions < Config.MIN_NUM_TRANSACTIONS)
     ).count()
 
-    print(f"Number of High Risk Businesses: {high_risk_businesses}")
-    print(f"Percentage of High Risk Businesses: {(high_risk_businesses / row['total_businesses']) * 100:.2f}%")
+    print(f"Number of High Risk Clients: {high_risk_clients}")
+    print(f"Percentage of High Risk Clients: {(high_risk_clients / row['total_clients']) * 100:.2f}%")
 
     print("Dashboard updated successfully.")
 

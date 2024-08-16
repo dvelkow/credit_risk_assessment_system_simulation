@@ -1,7 +1,8 @@
-# utils/spark_utils.py
-
+import os
 from pyspark.sql import SparkSession
 from config.config import Config
+
+os.environ['PYSPARK_SUBMIT_ARGS'] = '--packages org.apache.hadoop:hadoop-aws:3.2.0 pyspark-shell'
 
 def get_spark_session():
     return (SparkSession.builder
@@ -13,13 +14,52 @@ def get_spark_session():
         .config("spark.default.parallelism", "100")
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.driver.host", "localhost")
-        .config("spark.driver.extraJavaOptions", "--add-opens=java.base/java.nio=ALL-UNNAMED")
-        .config("spark.executor.extraJavaOptions", "--add-opens=java.base/java.nio=ALL-UNNAMED")
+        .config("spark.local.ip", "192.168.0.111")  # Use your actual IP address here
+        .config("spark.driver.extraJavaOptions", 
+                "-Dlog4j.logLevel=WARN " +
+                "--add-opens=java.base/java.lang=ALL-UNNAMED " +
+                "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED " +
+                "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED " +
+                "--add-opens=java.base/java.io=ALL-UNNAMED " +
+                "--add-opens=java.base/java.net=ALL-UNNAMED " +
+                "--add-opens=java.base/java.nio=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.security.action=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED " +
+                "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+        )
+        .config("spark.executor.extraJavaOptions", 
+                "-Dlog4j.logLevel=WARN " +
+                "--add-opens=java.base/java.lang=ALL-UNNAMED " +
+                "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED " +
+                "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED " +
+                "--add-opens=java.base/java.io=ALL-UNNAMED " +
+                "--add-opens=java.base/java.net=ALL-UNNAMED " +
+                "--add-opens=java.base/java.nio=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.security.action=ALL-UNNAMED " +
+                "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED " +
+                "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+        )
         .getOrCreate())
 
 def setup_spark_session(spark):
-    spark.sparkContext.setLogLevel("ERROR")
+    spark.sparkContext.setLogLevel("WARN")
+    
+    # Suppress specific warnings
+    logger = spark._jvm.org.apache.log4j
+    logger.LogManager.getLogger("org.apache.spark.util.NativeCodeLoader").setLevel(logger.Level.ERROR)
+    logger.LogManager.getLogger("org.apache.spark.scheduler.TaskSchedulerImpl").setLevel(logger.Level.ERROR)
 
+    
 def read_parquet(spark, path):
     """
     Read a Parquet file and return a DataFrame.
