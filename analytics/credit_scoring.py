@@ -1,91 +1,71 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, udf
+from pyspark.sql.functions import udf
 from pyspark.sql.types import FloatType, StringType
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import RandomForestRegressor
 from pyspark.ml.evaluation import RegressionEvaluator
-from config.config import Config
+
+# Constants
+MIN_CREDIT_SCORE, MAX_CREDIT_SCORE = 300, 850
+MIN_SAVINGS_APY, MAX_SAVINGS_APY = 0.01, 0.05
+MIN_LENDING_RATE, MAX_LENDING_RATE = 0.05, 0.25
+DATA_LAKE_PATH = "path/to/your/data/lake"
 
 def calculate_risk_score(credit_score, balance, num_transactions):
-    # Normalize each factor
-    credit_score_factor = (credit_score - Config.MIN_CREDIT_SCORE) / (Config.MAX_CREDIT_SCORE - Config.MIN_CREDIT_SCORE)
-    balance_factor = min(balance / 50000, 1)  # Assuming 50,000 as a high balance
-    transaction_factor = min(num_transactions / 1000, 1)  # Assuming 1000 as a high number of transactions
+    credit_factor = (credit_score - MIN_CREDIT_SCORE) / (MAX_CREDIT_SCORE - MIN_CREDIT_SCORE)
+    balance_factor = min(balance / 50000, 1)
+    transaction_factor = min(num_transactions / 1000, 1)
     
-    # Calculate weighted score (higher is better)
-    weighted_score = credit_score_factor * 0.6 + balance_factor * 0.3 + transaction_factor * 0.1
-    
-    # Convert to a 0-100 scale where lower is riskier
+    weighted_score = credit_factor * 0.6 + balance_factor * 0.3 + transaction_factor * 0.1
     return (1 - weighted_score) * 100
 
-def calculate_savings_apy(risk_score):
-    return max(Config.MIN_SAVINGS_APY, min(Config.MAX_SAVINGS_APY, Config.MIN_SAVINGS_APY + (100 - risk_score) / 20))
+def calculate_rates(risk_score):
+    savings_apy = max(MIN_SAVINGS_APY, min(MAX_SAVINGS_APY, MIN_SAVINGS_APY + (100 - risk_score) / 20))
+    lending_rate = max(MIN_LENDING_RATE, min(MAX_LENDING_RATE, MIN_LENDING_RATE + risk_score / 10))
+    return savings_apy, lending_rate
 
-def calculate_lending_rate(risk_score):
-    return max(Config.MIN_LENDING_RATE, min(Config.MAX_LENDING_RATE, Config.MIN_LENDING_RATE + risk_score / 10))
-
-def determine_risk_category(risk_score):
-    if risk_score < 20:
-        return "Very Low Risk"
-    elif risk_score < 40:
-        return "Low Risk"
-    elif risk_score < 60:
-        return "Moderate Risk"
-    elif risk_score < 80:
-        return "High Risk"
-    else:
-        return "Very High Risk"
+def get_risk_category(risk_score):
+    categories = ["Very Low Risk", "Low Risk", "Moderate Risk", "High Risk", "Very High Risk"]
+    return categories[min(int(risk_score / 20), 4)]
 
 def prepare_data(spark):
-    return spark.read.parquet(f"{Config.DATA_LAKE_PATH}/fact_credit_risk")
-
-def train_credit_scoring_model(spark):
-    data = prepare_data(spark)
-    
+    data = spark.read.parquet(f"{DATA_LAKE_PATH}/fact_credit_risk")
     risk_score_udf = udf(calculate_risk_score, FloatType())
-    data = data.withColumn("risk_score", risk_score_udf(col("latest_credit_score"), col("latest_balance"), col("total_transactions")))
+    return data.withColumn("risk_score", risk_score_udf("latest_credit_score", "latest_balance", "total_transactions"))
+
+def train_model(data):
+    features = ["latest_balance", "total_transactions", "latest_credit_score"]
+    assembled_data = VectorAssembler(inputCols=features, outputCol="features").transform(data)
+    train_data, test_data = assembled_data.randomSplit([0.8, 0.2], seed=42)
+
+    model = RandomForestRegressor(featuresCol="features", labelCol="risk_score", numTrees=10).fit(train_data)
     
-    feature_columns = ["latest_balance", "total_transactions", "latest_credit_score"]
-    assembler = VectorAssembler(inputCols=feature_columns, outputCol="features")
-    data_assembled = assembler.transform(data)
-
-    train_data, test_data = data_assembled.randomSplit([0.8, 0.2], seed=42)
-
-    rf = RandomForestRegressor(featuresCol="features", labelCol="risk_score", numTrees=10)
-    model = rf.fit(train_data)
-
     predictions = model.transform(test_data)
-    evaluator = RegressionEvaluator(labelCol="risk_score", predictionCol="prediction", metricName="rmse")
-    rmse = evaluator.evaluate(predictions)
-
-    print(f"Root Mean Squared Error (RMSE) on test data: {rmse}")
-
+    rmse = RegressionEvaluator(labelCol="risk_score", predictionCol="prediction", metricName="rmse").evaluate(predictions)
+    print(f"Model RMSE: {rmse}")
+    
     return model
 
 def score_client(spark, model, client_id):
-    data = prepare_data(spark).filter(col("client_id") == client_id)
+    client_data = prepare_data(spark).filter(f"client_id = '{client_id}'")
     
-    if data.count() == 0:
+    if client_data.count() == 0:
         print(f"No data found for Client ID: {client_id}")
         return
 
-    risk_score_udf = udf(calculate_risk_score, FloatType())
-    data = data.withColumn("risk_score", risk_score_udf(col("latest_credit_score"), col("latest_balance"), col("total_transactions")))
-
-    savings_apy_udf = udf(calculate_savings_apy, FloatType())
-    lending_rate_udf = udf(calculate_lending_rate, FloatType())
-    risk_category_udf = udf(determine_risk_category, StringType())
+    rates_udf = udf(lambda score: calculate_rates(score), FloatType())
+    category_udf = udf(get_risk_category, StringType())
     
-    data = data.withColumn("savings_apy", savings_apy_udf(col("risk_score")))
-    data = data.withColumn("lending_rate", lending_rate_udf(col("risk_score")))
-    data = data.withColumn("risk_category", risk_category_udf(col("risk_score")))
+    result = model.transform(VectorAssembler(
+        inputCols=["latest_balance", "total_transactions", "latest_credit_score"],
+        outputCol="features"
+    ).transform(client_data))
 
-    feature_columns = ["latest_balance", "total_transactions", "latest_credit_score"]
-    assembler = VectorAssembler(inputCols=feature_columns, outputCol="features")
-    data_assembled = assembler.transform(data)
-
-    prediction = model.transform(data_assembled)
-    result = prediction.select("client_id", "latest_credit_score", "latest_balance", "total_transactions", "risk_score", "savings_apy", "lending_rate", "risk_category", "prediction").first()
+    result = result.withColumns({
+        "savings_apy": rates_udf(result.risk_score)[0],
+        "lending_rate": rates_udf(result.risk_score)[1],
+        "risk_category": category_udf(result.risk_score)
+    }).first()
 
     print(f"Credit Risk Assessment for Client ID {client_id}:")
     print(f"Credit Score: {result['latest_credit_score']}")
@@ -96,10 +76,10 @@ def score_client(spark, model, client_id):
     print(f"Savings APY: {result['savings_apy']:.2%}")
     print(f"Lending Rate: {result['lending_rate']:.2%}")
     print(f"Risk Category: {result['risk_category']}")
-    print(f"")
-    
+
 if __name__ == "__main__":
     spark = SparkSession.builder.appName("CreditScoring").getOrCreate()
-    model = train_credit_scoring_model(spark)
+    data = prepare_data(spark)
+    model = train_model(data)
     score_client(spark, model, "C001")  # Replace with an actual client ID
     spark.stop()
