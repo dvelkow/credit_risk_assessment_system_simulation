@@ -1,46 +1,95 @@
-## Overview
-The project is made to make real-time credit risk assessment based on the (bank) client profiles it is given by leveraging big data processing and machine learning, simulating how a bank might evaluate and manage credit risk for its clients.
+# Credit Risk Assessment System Simulation
 
-#### Simulated Output Example
-![image](https://github.com/user-attachments/assets/1d1673c8-e598-43f3-800b-93e2b552f3e1)
+A visually stunning terminal-based application that assesses credit risk for a pool of customers (either simulated or real data) using a weighted scorecard algorithm. It features animated progress bars, beautiful tables, and aggregated summary analytics, all built with the excellent `rich` library.
 
+![Screenshot](screenshot.png) *(Preview of the terminal interface)*
 
+## 🌟 Features
 
-## How It Works
+- **Realistic Scoring Model**: Evaluates applicants utilizing factors such as credit score, payment history, DTI limit, credit utilization, recent bankruptcies, and missed history.
+- **Dynamic Application Parsing**: Reads actual applicant data from a standard `.CSV` file.
+- **Output Report Generation**: Saves fully assessed applicants—including their calculated limits and rates—back to a `.CSV` file.
+- **Auto-Generated Simulation**: Easily test the algorithmic limits by simulating 50+ random client profiles with statistically correlated fields.
+- **Beautiful Terminal TUI**: Animated load progress, color gradients, informative emojis, custom bar charts, and dynamically aligned comparison columns leveraging `rich`.
 
-1. **Data Ingestion**: The system simulates the ingestion of financial data including credit scores, account balances, and transaction histories for thousands of clients.
+## 📁 Repository Structure
 
-2. **Data Processing**: Leveraging PySpark's distributed computing capabilities, the raw data is cleaned, transformed, and prepared for analysis at scale.
+We employ a modular architecture:
 
-3. **Machine Learning Model**: 
-   - A Random Forest Regressor is trained on historical data to predict credit risk scores.
-   - The model considers multiple factors including credit score, account balance, and transaction frequency.
+- `models.py`: Contains the `Profile` dataclass definition handling entity structure.
+- `assessment.py`: The robust scoring algorithm returning risk and limits calculations.
+- `data_io.py`: Ingests and exports `.CSV` files mapped explicitly to the `Profile` model.
+- `generator.py`: An engine returning populated `Profile` objects full of realistic fake data.
+- `ui.py`: Manages all `rich` terminal printing, rendering the tables, columns, and dashboards.
+- `main.py`: The application entry point managing configuration logic and executing the simulation/pipeline.
 
-4. **Risk Scoring**: 
-   - Each client's risk is calculated using an algorithm that normalizes and weights various financial factors.
-   - The calculated risk score is then used to categorize clients into risk categories ranging from "Very Low Risk" to "Very High Risk".
+## 🚀 Installation
 
-5. **Dynamic Rate Calculation**:
-   - Based on the risk assessment, the system dynamically calculates personalized savings APY and lending rates for each client.
-   - This ensures competitive rates while managing the bank's overall risk exposure.
+Ensure you have Python 3.8+ installed. 
 
-6. **Real-time Assessment**: As new financial data comes in, the system can rapidly reassess a client's credit risk, allowing for up-to-date risk management.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/credit-risk-simulation.git
+   cd credit-risk-simulation
+   ```
 
-7. **Risk Dashboard**: A comprehensive dashboard provides bank managers with key metrics including average credit scores, risk distributions, and potential high-risk clients.
+2. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
+## 💻 Usage
 
-## Installation
+Run the primary application script via `python main.py` using any of the arguments below.
 
-Clone the repository:
+```bash
+usage: main.py [-h] [--simulate NUM] [--input FILE] [--output FILE]
+```
 
-`git clone https://github.com/dvelkow/credit_risk_data_lake_for_lending`
+### Options
 
-Install the required packages:
+| Flag | Description |
+| ---- | ----------- |
+| `--simulate [N]` | Run a generated simulation with `[N]` random profiles. If omitted alongside `--input`, defaults to `50`. |
+| `--input [FILE.csv]` | Process real applicant data loaded from a provided CSV file path instead of generating fake data. |
+| `--output [FILE.csv]` | Export the fully assessed profiles pipeline results to a CSV file. |
+| `-h, --help` | Display the helper text. |
 
-`pip install -r requirements.txt`
+### Examples
 
-Run the main data lake:
+**Run the default simulation (50 profiles):**
+```bash
+python main.py
+```
 
-`python main.py`
+**Run a larger simulation (500 profiles):**
+```bash
+python main.py --simulate 500
+```
 
-(It would run with random/mock data, but you can easily connect it to a real database through the main.py file)
+**Process a real dataset and dump the results:**
+```bash
+python main.py --input raw_clients.csv --output assessed_results.csv
+```
+
+## 📊 CSV Input Format
+
+If using `--input`, your target CSV should have the following headers (order doesn't matter):
+
+`id, name, age, occupation, annual_income, credit_score, existing_debt, employment_years, num_credit_accounts, payment_history, credit_utilization, loan_amount_requested, loan_purpose, recent_bankruptcies, missed_payments_history`
+
+## 🧠 Risk Assessment Algorithm
+
+The assessment logic computes a composite score (0-100) weighted across seven categories:
+
+- **30%**: Credit Score
+- **20%**: Payment History (adjusted heavily depending on previous missed payment events)
+- **15%**: Debt-to-Income (DTI)
+- **10%**: Emploment Stability
+- **10%**: Credit Utilization Ratio
+- **10%**: Loan Amount to Income Ratio
+- **5%**: Requested Loan Purpose Risk
+
+Modifiers:
+- Applicants possessing any `recent_bankruptcies` automatically face a maximum score cap at "Very Poor".
+- Extremely high DTI applies secondary multiplicative constraints.

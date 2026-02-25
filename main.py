@@ -1,68 +1,83 @@
-import random
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
-from config.config import Config
-from data_processing import data_quality, data_cleansing, entity_resolution
-from data_modeling import dimensional_model
-from analytics import credit_scoring, risk_dashboard
-from data_ingestion.account_types import create_account_types
-from utils.spark_utils import get_spark_session, setup_spark_session
+#!/usr/bin/env python3
+"""
+Credit Risk Assessment System
+─────────────────────────────
+Ingests real CSV applicant data or generates a simulation, 
+assesses credit risk using a scorecard model, and outputs beautiful terminal analytics.
+"""
 
-def generate_mock_data(spark):
-    schema = StructType([
-        StructField("client_id", StringType(), True),
-        StructField("transaction_date", StringType(), True),
-        StructField("balance", FloatType(), True),
-        StructField("num_transactions", IntegerType(), True),
-        StructField("credit_score", IntegerType(), True)
-    ])
-    
-    data = [
-        (
-            customer_id,
-            f"2023-{str(random.randint(1, 12)).zfill(2)}-{str(random.randint(1, 28)).zfill(2)}",
-            random.uniform(100, 50000),
-            random.randint(1, 100),
-            random.randint(Config.MIN_CREDIT_SCORE, Config.MAX_CREDIT_SCORE)
-        )
-        for customer_id in Config.TEST_CUSTOMER_IDS
-        for _ in range(12)  # 12 entries per customer to simulate monthly data
-    ]
-    
-    df = spark.createDataFrame(data, schema)
-    df.write.mode("overwrite").parquet(f"{Config.DATA_LAKE_PATH}/personal_financial_data")
+import argparse
+import time
 
-    print("Mock data generated successfully.")
+from generator import generate_profile
+from assessment import assess_risk
+from data_io import load_profiles_from_csv, export_profiles_to_csv
+import ui
 
 def main():
-    spark = get_spark_session()
-    setup_spark_session(spark)
+    parser = argparse.ArgumentParser(description="Credit Risk Assessment System")
+    parser.add_argument("--simulate", type=int, metavar="NUM", 
+                        help="Run a simulation generating NUM random profiles (Default: 50)")
+    parser.add_argument("--input", type=str, metavar="FILE", 
+                        help="Process real applicant data from a CSV file")
+    parser.add_argument("--output", type=str, metavar="FILE", 
+                        help="Export the assessed results to a CSV file")
     
-    generate_mock_data(spark)
-    create_account_types(spark)
+    args = parser.parse_args()
 
-    data_quality.check_data_quality(spark, "personal_financial_data")
-    data_cleansing.clean_data(spark)
-    entity_resolution.resolve_entities(spark)
+    ui.console.clear()
+    ui.show_banner()
+    time.sleep(0.5)
 
-    dimensional_model.create_dimensional_model(spark)
+    profiles = []
 
-    model = credit_scoring.train_credit_scoring_model(spark)
-    
-    sample_clients = spark.read.parquet(f"{Config.DATA_LAKE_PATH}/dim_client") \
-                             .limit(10) \
-                             .select("client_id") \
-                             .rdd.flatMap(lambda x: x).collect()
-    
-    for client_id in sample_clients:
-        try:
-            credit_scoring.score_client(spark, model, client_id)
-        except Exception as e:
-            print(f"Error scoring client {client_id}: {str(e)}")
-    
-    risk_dashboard.update_dashboard(spark)
+    # Phase 1: Ingestion
+    if args.input:
+        ui.console.rule("[bold bright_cyan]⚡ Phase 1: Data Ingestion ⚡[/]", style="bright_cyan", characters="━")
+        ui.console.print()
+        profiles = load_profiles_from_csv(args.input)
+        ui.display_generation_progress(len(profiles))
+    else:
+        # Default to simulation if no input provided
+        num_profiles = args.simulate if args.simulate else 50
+        ui.console.rule("[bold bright_cyan]⚡ Phase 1: Profile Simulation ⚡[/]", style="bright_cyan", characters="━")
+        ui.console.print()
+        ui.display_generation_progress(num_profiles)
+        profiles = [generate_profile(i + 1) for i in range(num_profiles)]
+        
+    if not profiles:
+        ui.console.print("[red]No profiles to process. Exiting.[/]")
+        return
 
-    spark.stop()
+    # Phase 2: Risk assessment
+    ui.console.rule("[bold bright_magenta]🔍 Phase 2: Risk Assessment 🔍[/]", style="bright_magenta", characters="━")
+    ui.console.print()
+    assessed_profiles = ui.display_assessment_progress(profiles, assess_risk)
+
+    # Output Export (optional non-UI step)
+    if args.output:
+        export_profiles_to_csv(assessed_profiles, args.output)
+        ui.console.print(f"  [green][+][/] Results exported to [bold]{args.output}[/]\n")
+
+    # Phase 3: Results
+    ui.console.rule("[bold bright_green]📊 Phase 3: Assessment Report 📊[/]", style="bright_green", characters="━")
+    ui.console.print()
+    ui.show_table_animated(assessed_profiles)
+
+    # Phase 4: Analytics
+    ui.console.rule("[bold bright_yellow]📈 Phase 4: Analytics & Summary 📈[/]", style="bright_yellow", characters="━")
+    ui.console.print()
+    ui.show_summary(assessed_profiles)
+    ui.show_top_bottom(assessed_profiles)
+
+    # Phase 5: Loan decisions
+    ui.console.rule("[bold bright_blue]🏦 Phase 5: Loan Decision Simulation 🏦[/]", style="bright_blue", characters="━")
+    ui.console.print()
+    ui.show_approval_simulation(assessed_profiles)
+
+    ui.console.rule("[bold dim]✅ Assessment Complete ✅[/]", style="dim", characters="━")
+    ui.console.print()
+
 
 if __name__ == "__main__":
     main()
