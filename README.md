@@ -1,6 +1,6 @@
 # Credit Risk Assessment System Simulation
 
-A visually stunning terminal-based application that assesses credit risk for a pool of customers (either simulated or real data) using a weighted scorecard algorithm. It features animated progress bars, beautiful tables, and aggregated summary analytics, all built with the excellent `rich` library.
+A terminal-based app that mimics credit risk assesment for a pool of customers using a weighted scorecard algorithm. It features animated progress bars, pretty tables, and aggregated summary analytics.
 
 <p align="center">
   <img src="photo/dashboardresult.png" alt="Dashboard Result" width="100%">
